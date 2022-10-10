@@ -15,7 +15,7 @@ app.UseHttpsRedirection();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-app.MapGet("/listacarrinhos", (APIContextDB db) => { return db.Carrinhos.Include(a => a.itens).ToList();}).WithName("listadeCarrinhos");
+app.MapGet("/listacarrinhos", (APIContextDB db) => { return Results.Ok(db.Carrinhos.Include(a => a.itens).ToList());}).WithName("listadeCarrinhos");
 
 app.MapGet("/itenscarrinhos", (APIContextDB db, int id) =>
 {
@@ -23,10 +23,10 @@ app.MapGet("/itenscarrinhos", (APIContextDB db, int id) =>
     if (carrinho != null)
         return Results.Ok(carrinho.itens);
     else
-        return Results.NoContent();
+        return Results.NotFound();
 });
 
-app.MapPost("/carrinhoadd/{idcarrinho}/{produtoID}", async (APIContextDB db, int idcarrinho, Produto produto)  =>
+app.MapPost("/carrinhoadd/{idcarrinho}", async (APIContextDB db, int idcarrinho, Produto produto)  =>
 {
     var Car = db.Carrinhos.Include(a => a.itens).Where(c => c.Id == idcarrinho).FirstOrDefault();
     if (Car == null)
@@ -35,7 +35,7 @@ app.MapPost("/carrinhoadd/{idcarrinho}/{produtoID}", async (APIContextDB db, int
         carrinho.Id = idcarrinho;
         carrinho.itens.Add(produto);
         db.Carrinhos.Add(carrinho);
-        db.SaveChanges();
+        await db.SaveChangesAsync();
     }
     else
     {
@@ -47,16 +47,23 @@ app.MapPost("/carrinhoadd/{idcarrinho}/{produtoID}", async (APIContextDB db, int
     Results.Ok();
 });
 
-app.MapDelete("/removeritem/{idcarrinho}/{iditem}", (APIContextDB db, int idcarrinho, int iditem) => {
+app.MapDelete("/removeritem/{idcarrinho}/{iditem}", async (APIContextDB db, int idcarrinho, int iditem) => {
     var Car = db.Carrinhos.Include(a => a.itens).Where(c => c.Id == idcarrinho).FirstOrDefault();
     var Prod = db.produtos.Where(p => p.codigo == iditem).FirstOrDefault();
     if (Car != null && Prod != null)
     {
-        Car.itens.Remove(Prod);
-        db.Carrinhos.Update(Car);
-        db.produtos.Remove(Prod);
-        db.SaveChanges();
-        return Results.Ok();
+        if (Car.itens.Contains(Prod))
+        {
+            Car.itens.Remove(Prod);
+            db.Carrinhos.Update(Car);
+            db.produtos.Remove(Prod);
+            await db.SaveChangesAsync();
+            return Results.Ok();
+        }
+        else
+        {
+            return Results.NotFound();
+        }
     }
     else
     {
@@ -64,7 +71,7 @@ app.MapDelete("/removeritem/{idcarrinho}/{iditem}", (APIContextDB db, int idcarr
     }
 });
 
-app.MapDelete("/removercarrinho/{idcarrinho}", (APIContextDB db, int idcarrinho) => {
+app.MapDelete("/removercarrinho/{idcarrinho}", async (APIContextDB db, int idcarrinho) => {
     var Car = db.Carrinhos.Include(a => a.itens).Where(c => c.Id == idcarrinho).FirstOrDefault();
     if (Car != null)
     {
@@ -75,7 +82,7 @@ app.MapDelete("/removercarrinho/{idcarrinho}", (APIContextDB db, int idcarrinho)
             db.produtos.Remove(prod);
         }
         db.Carrinhos.Remove(Car);
-        db.SaveChanges();
+        await db.SaveChangesAsync();
         return Results.Ok();
     }
     else
